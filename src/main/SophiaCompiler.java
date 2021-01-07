@@ -47,7 +47,9 @@ public class SophiaCompiler {
         try {
             System.out.println("\n-------------------Generating Class Files-------------------");
             File dir = new File("./output");
-            Process process = Runtime.getRuntime().exec("java -jar jasmin.jar *.j", null, dir);
+//            Process process = Runtime.getRuntime().exec("java -jar jasmin.jar *.j", null, dir);
+            Process process = Runtime.getRuntime().exec(new String[]{"bash", "-c", "java -jar jasmin.jar *.j"}, null, dir);
+
             printResults(process.getInputStream());
             printResults(process.getErrorStream());
             System.out.println("\n---------------------------Output---------------------------");

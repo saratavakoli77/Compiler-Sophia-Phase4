@@ -1,11 +1,16 @@
 class A{
     a: int;
     def A() {
-
+        //print("hello");
     }
 }
 class Main{
+    def void test(m: string, s: int) {
+        a: int;
+        b: A;
+    }
     def Main() {
-        //print("salam");
+        //a: int;
+
     }
 }

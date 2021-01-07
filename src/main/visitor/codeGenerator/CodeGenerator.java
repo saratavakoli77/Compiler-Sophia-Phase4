@@ -22,7 +22,6 @@ import main.ast.nodes.statement.loop.ForeachStmt;
 import main.ast.types.NullType;
 import main.ast.types.Type;
 import main.ast.types.functionPointer.FptrType;
-import main.ast.types.list.ListNameType;
 import main.ast.types.list.ListType;
 import main.ast.types.single.BoolType;
 import main.ast.types.single.ClassType;
@@ -110,13 +109,29 @@ public class CodeGenerator extends Visitor<String> {
         } catch (IOException e) {}
     }
 
+//    private String makeTypeSignature(Type t) {
+//        if (t instanceof IntType)
+//            return "I";
+//        else if (t instanceof ListType) //todo: is it ok?
+//            return "[I";
+//        else if (t instanceof BoolType)
+//            return "Z";
+//        else if (t instanceof StringType)
+//            return "Ljava/lang/String;";
+//        else if (t instanceof ClassType)
+//            return String.format("L%s;", ((ClassType) t).getClassName().getName());
+//        else
+//            return "ERROR Type";
+//        //todo fptrType
+//    }
+
     private String makeTypeSignature(Type t) {
         if (t instanceof IntType)
-            return "I";
+            return "Ljava/lang/Integer;";
         else if (t instanceof ListType) //todo: is it ok?
             return "[I";
         else if (t instanceof BoolType)
-            return "Z";
+            return "Ljava/lang/Boolean;";
         else if (t instanceof StringType)
             return "Ljava/lang/String;";
         else if (t instanceof ClassType)
@@ -134,18 +149,24 @@ public class CodeGenerator extends Visitor<String> {
         }
     }
 
-    private void initializeVariableDeclaration(VarDeclaration varDeclaration) {
+    private String putInitValue(VarDeclaration varDeclaration) {
         Type varType = varDeclaration.getType();
-        addCommand("aload_0"); //todo: should it be here? or just in addDefaultConstructor
+        //addCommand("aload_0"); //todo: should it be here? or just in addDefaultConstructor
         if (varType instanceof IntType || varType instanceof BoolType) {
             addCommand("iconst_0");
+            return "istore";
         } else if (varType instanceof StringType) {
             addCommand("ldc \"\"");
+            return "astore";
         } else if (varType instanceof FptrType || varType instanceof ClassType) {
             addCommand("aconst_null");
+            return "astore";
         } else if (varType instanceof ListType) {
             //todo: how to add new List?
+
+            return "astore";
         }
+        return "";
     }
 
     private void addStackLocalSize() {
@@ -159,14 +180,24 @@ public class CodeGenerator extends Visitor<String> {
 
     private void initializeFields() {
         for (FieldDeclaration fieldDeclaration : currentClass.getFields()) {
-            initializeVariableDeclaration(fieldDeclaration.getVarDeclaration());
+            VarDeclaration varDec = fieldDeclaration.getVarDeclaration();
+            putInitValue(varDec);
+            addCommand(
+                    String.format(
+                            "putfield %s/%s %s",
+                            currentClass.getClassName().getName(),
+                            varDec.getVarName().getName(),
+                            varDec.getType()
+                    )
+            );
         }
     }
 
     private void addDefaultConstructor() {
         addCommand(".method public <init>()V"); //todo: input is empty or I?
         addStackLocalSize();
-        addCommand("aload_0");
+        addCommand(";in addDefaultConstructor");
+        addCommand("aload 0");
         callParentConstructor();
         initializeFields();
         addCommand("return");
@@ -177,13 +208,31 @@ public class CodeGenerator extends Visitor<String> {
         addCommand(".method public static main([Ljava/lang/String;)V");
         addStackLocalSize();
         addCommand(String.format("new %s", "Main"));
-        addCommand("dup");
         addCommand(String.format("invokespecial %s/<init>()V", "Main"));
+        addCommand("return");
+        addCommand(".end method");
     }
 
     private int slotOf(String identifier) {
-        //todo
-        return 0;
+        int index = 1;
+        for (VarDeclaration arg: currentMethod.getArgs()) {
+            if (arg.getVarName().getName().equals(identifier)) {
+                return index;
+            }
+            index ++;
+        }
+
+        for (VarDeclaration localVar: currentMethod.getLocalVars()) {
+            if (localVar.getVarName().getName().equals(identifier)) {
+                return index;
+            }
+            index ++;
+        }
+
+        if (identifier.equals("")) {
+            return index;
+        }
+        return index;
     }
 
     private String getClassParentName(ClassDeclaration classDeclaration) {
@@ -200,7 +249,7 @@ public class CodeGenerator extends Visitor<String> {
     private void methodBodyVisitor(MethodDeclaration methodDeclaration) {
         for (VarDeclaration localVar: methodDeclaration.getLocalVars()) {
             localVar.accept(this);
-            initializeVariableDeclaration(localVar);
+            putInitValue(localVar);
         }
 
         for (Statement statement: methodDeclaration.getBody()) {
@@ -231,7 +280,9 @@ public class CodeGenerator extends Visitor<String> {
         createFile(className);
 
         addCommand(String.format(".class public %s", className));
-        addCommand(String.format(".super class %s", getClassParentName(classDeclaration)));
+        addCommand(String.format(".super %s", getClassParentName(classDeclaration)));
+        addCommand("");
+        addCommand("");
         for (FieldDeclaration fieldDeclaration : classDeclaration.getFields()) {
             fieldDeclaration.accept(this);
         }
@@ -260,13 +311,10 @@ public class CodeGenerator extends Visitor<String> {
             addDefaultConstructor();
         }
 
-        // main constructor is different
         if (isClassMain(currentClass)) {
             addStaticMainMethod();
-            methodBodyVisitor(constructorDeclaration);
-        } else {
-            this.visit((MethodDeclaration) constructorDeclaration);
         }
+        this.visit((MethodDeclaration) constructorDeclaration);
         return null;
     }
 
@@ -277,17 +325,25 @@ public class CodeGenerator extends Visitor<String> {
             argumentString.append(makeTypeSignature(arg.getType()));
         }
 
-        addCommand(String.format(".method public <init>(%s)%s", argumentString, makeReturnTypeSignature(methodDeclaration)));
+        if (methodDeclaration instanceof ConstructorDeclaration) {
+            addCommand(String.format(".method public <init>(%s)%s", argumentString, makeReturnTypeSignature(methodDeclaration)));
+        } else {
+            addCommand(String.format(".method public %s(%s)%s", methodDeclaration.getMethodName().getName(), argumentString, makeReturnTypeSignature(methodDeclaration)));
+        }
+
         addStackLocalSize();
-        addCommand("aload_0");
+        //addCommand(";in visit MethodDeclaration");
+        addCommand("aload 0");
 
         if (methodDeclaration instanceof ConstructorDeclaration) {
             callParentConstructor();
+            //addCommand("aload_0");
             initializeFields();
         }
 
         methodBodyVisitor(methodDeclaration);
-
+        addCommand("");
+        addCommand("");
         return null;
     }
 
@@ -296,8 +352,8 @@ public class CodeGenerator extends Visitor<String> {
         addCommand(
                 String.format(
                         ".field %s %s",
-                        makeTypeSignature(fieldDeclaration.getVarDeclaration().getType()),
-                        fieldDeclaration.getVarDeclaration().getVarName().getName()
+                        fieldDeclaration.getVarDeclaration().getVarName().getName(),
+                        makeTypeSignature(fieldDeclaration.getVarDeclaration().getType())
                 )
         );
         return null;
@@ -305,7 +361,8 @@ public class CodeGenerator extends Visitor<String> {
 
     @Override
     public String visit(VarDeclaration varDeclaration) {
-        //todo
+        String storeCommand = putInitValue(varDeclaration);
+        addCommand(String.format("%s %d", storeCommand, slotOf(varDeclaration.getVarName().getName())));
         return null;
     }
 
@@ -338,11 +395,11 @@ public class CodeGenerator extends Visitor<String> {
     @Override
     public String visit(PrintStmt print) {
         Expression arg = print.getArg();
-//        currentWriter.println("\tgetstatic java/lang/System/out Ljava/io/PrintStream;");
+        addCommand("getstatic java/lang/System/out Ljava/io/PrintStream");
 
         Type argType = arg.accept(expressionTypeChecker);
         addCommand(
-                String.format("\tinvokevirtual java/io/PrintStream/println(%s)V",
+                String.format("invokevirtual java/io/PrintStream/println(%s)V",
                         makeTypeSignature(argType)
                 )
         );
@@ -352,11 +409,15 @@ public class CodeGenerator extends Visitor<String> {
     @Override
     public String visit(ReturnStmt returnStmt) {
         Type type = returnStmt.getReturnedExpr().accept(expressionTypeChecker);
-        if(type instanceof NullType) {
+        if (type instanceof NullType) {
             addCommand("return");
-        }
-        else {
-            //todo add commands to return
+        } else {
+            if (type instanceof IntType) {
+                addCommand("invokestatic java/lang/Integer/valueOf(I)Ljava/lang/Integer;");
+            } else if (type instanceof BoolType) {
+                addCommand("invokestatic java/lang/Boolean/valueOf(Z)Ljava/lang/Boolean;");
+            }
+            addCommand("areturn");
         }
         return null;
     }
