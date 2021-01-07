@@ -1,0 +1,11 @@
+class A{
+    a: int;
+    def A() {
+
+    }
+}
+class Main{
+    def Main() {
+        //print("salam");
+    }
+}

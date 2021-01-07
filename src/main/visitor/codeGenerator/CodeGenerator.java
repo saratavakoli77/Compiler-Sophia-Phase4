@@ -35,6 +35,7 @@ import main.symbolTable.items.FieldSymbolTableItem;
 import main.symbolTable.utils.graph.Graph;
 import main.visitor.Visitor;
 import main.visitor.typeChecker.ExpressionTypeChecker;
+//import utilities.codeGenerationUtilityClasses.*;
 
 import java.io.*;
 
@@ -110,16 +111,74 @@ public class CodeGenerator extends Visitor<String> {
     }
 
     private String makeTypeSignature(Type t) {
-        //todo
-        return null;
+        if (t instanceof IntType)
+            return "I";
+        else if (t instanceof ListType) //todo: is it ok?
+            return "[I";
+        else if (t instanceof BoolType)
+            return "Z";
+        else if (t instanceof StringType)
+            return "Ljava/lang/String;";
+        else if (t instanceof ClassType)
+            return String.format("L%s;", ((ClassType) t).getClassName().getName());
+        else
+            return "ERROR Type";
+        //todo fptrType
+    }
+
+    private String makeReturnTypeSignature(MethodDeclaration methodDeclaration) {
+        if (methodDeclaration.getReturnType() instanceof NullType) {
+            return "V";
+        } else {
+            return makeTypeSignature(methodDeclaration.getReturnType());
+        }
+    }
+
+    private void initializeVariableDeclaration(VarDeclaration varDeclaration) {
+        Type varType = varDeclaration.getType();
+        addCommand("aload_0"); //todo: should it be here? or just in addDefaultConstructor
+        if (varType instanceof IntType || varType instanceof BoolType) {
+            addCommand("iconst_0");
+        } else if (varType instanceof StringType) {
+            addCommand("ldc \"\"");
+        } else if (varType instanceof FptrType || varType instanceof ClassType) {
+            addCommand("aconst_null");
+        } else if (varType instanceof ListType) {
+            //todo: how to add new List?
+        }
+    }
+
+    private void addStackLocalSize() {
+        addCommand(".limit stack 128");
+        addCommand(".limit locals 128");
+    }
+
+    private void callParentConstructor() {
+        addCommand(String.format("invokespecial %s/<init>()V", getClassParentName(currentClass)));
+    }
+
+    private void initializeFields() {
+        for (FieldDeclaration fieldDeclaration : currentClass.getFields()) {
+            initializeVariableDeclaration(fieldDeclaration.getVarDeclaration());
+        }
     }
 
     private void addDefaultConstructor() {
-        //todo
+        addCommand(".method public <init>()V"); //todo: input is empty or I?
+        addStackLocalSize();
+        addCommand("aload_0");
+        callParentConstructor();
+        initializeFields();
+        addCommand("return");
+        addCommand(".end method");
     }
 
     private void addStaticMainMethod() {
-        //todo
+        addCommand(".method public static main([Ljava/lang/String;)V");
+        addStackLocalSize();
+        addCommand(String.format("new %s", "Main"));
+        addCommand("dup");
+        addCommand(String.format("invokespecial %s/<init>()V", "Main"));
     }
 
     private int slotOf(String identifier) {
@@ -127,39 +186,120 @@ public class CodeGenerator extends Visitor<String> {
         return 0;
     }
 
+    private String getClassParentName(ClassDeclaration classDeclaration) {
+        if (classDeclaration.getParentClassName() != null) {
+            return  classDeclaration.getParentClassName().getName();
+        }
+        return "java/lang/Object";
+    }
+
+    private Boolean isClassMain(ClassDeclaration classDeclaration) {
+        return classDeclaration.getClassName().getName().equals("Main");
+    }
+
+    private void methodBodyVisitor(MethodDeclaration methodDeclaration) {
+        for (VarDeclaration localVar: methodDeclaration.getLocalVars()) {
+            localVar.accept(this);
+            initializeVariableDeclaration(localVar);
+        }
+
+        for (Statement statement: methodDeclaration.getBody()) {
+            statement.accept(this);
+
+        }
+
+        if (!methodDeclaration.getDoesReturn()) {
+            addCommand("return");
+        }
+
+        addCommand(".end method");
+    }
+
     @Override
     public String visit(Program program) {
-        //todo
+        for (ClassDeclaration classDeclaration : program.getClasses()) {
+            this.expressionTypeChecker.setCurrentClass(classDeclaration);
+            this.currentClass = classDeclaration;
+            classDeclaration.accept(this);
+        }
         return null;
     }
 
     @Override
     public String visit(ClassDeclaration classDeclaration) {
-        //todo
+        String className = classDeclaration.getClassName().getName();
+        createFile(className);
+
+        addCommand(String.format(".class public %s", className));
+        addCommand(String.format(".super class %s", getClassParentName(classDeclaration)));
+        for (FieldDeclaration fieldDeclaration : classDeclaration.getFields()) {
+            fieldDeclaration.accept(this);
+        }
+
+        if (classDeclaration.getConstructor() != null) {
+            this.expressionTypeChecker.setCurrentMethod(classDeclaration.getConstructor());
+            currentMethod = classDeclaration.getConstructor();
+            classDeclaration.getConstructor().accept(this);
+        } else {
+            addDefaultConstructor();
+        }
+
+        for (MethodDeclaration methodDeclaration : classDeclaration.getMethods()) {
+            this.expressionTypeChecker.setCurrentMethod(methodDeclaration);
+            this.currentMethod = methodDeclaration;
+            methodDeclaration.accept(this);
+        }
+
         return null;
     }
 
     @Override
     public String visit(ConstructorDeclaration constructorDeclaration) {
         //todo add default constructor or static main method if needed
-        this.visit((MethodDeclaration) constructorDeclaration);
+        if (constructorDeclaration.getArgs().size() > 0) {
+            addDefaultConstructor();
+        }
+
+        // main constructor is different
+        if (isClassMain(currentClass)) {
+            addStaticMainMethod();
+            methodBodyVisitor(constructorDeclaration);
+        } else {
+            this.visit((MethodDeclaration) constructorDeclaration);
+        }
         return null;
     }
 
     @Override
     public String visit(MethodDeclaration methodDeclaration) {
-        //todo add method or constructor headers
-        if(methodDeclaration instanceof ConstructorDeclaration) {
-            //todo call parent constructor
-            //todo initialize fields
+        StringBuilder argumentString = new StringBuilder();
+        for (VarDeclaration arg: methodDeclaration.getArgs()) {
+            argumentString.append(makeTypeSignature(arg.getType()));
         }
-        //todo visit local vars and body and add return if needed
+
+        addCommand(String.format(".method public <init>(%s)%s", argumentString, makeReturnTypeSignature(methodDeclaration)));
+        addStackLocalSize();
+        addCommand("aload_0");
+
+        if (methodDeclaration instanceof ConstructorDeclaration) {
+            callParentConstructor();
+            initializeFields();
+        }
+
+        methodBodyVisitor(methodDeclaration);
+
         return null;
     }
 
     @Override
     public String visit(FieldDeclaration fieldDeclaration) {
-        //todo
+        addCommand(
+                String.format(
+                        ".field %s %s",
+                        makeTypeSignature(fieldDeclaration.getVarDeclaration().getType()),
+                        fieldDeclaration.getVarDeclaration().getVarName().getName()
+                )
+        );
         return null;
     }
 
@@ -177,7 +317,9 @@ public class CodeGenerator extends Visitor<String> {
 
     @Override
     public String visit(BlockStmt blockStmt) {
-        //todo
+        for (Statement stmt : blockStmt.getStatements()) {
+            stmt.accept(this);
+        }
         return null;
     }
 
@@ -195,7 +337,15 @@ public class CodeGenerator extends Visitor<String> {
 
     @Override
     public String visit(PrintStmt print) {
-        //todo
+        Expression arg = print.getArg();
+//        currentWriter.println("\tgetstatic java/lang/System/out Ljava/io/PrintStream;");
+
+        Type argType = arg.accept(expressionTypeChecker);
+        addCommand(
+                String.format("\tinvokevirtual java/io/PrintStream/println(%s)V",
+                        makeTypeSignature(argType)
+                )
+        );
         return null;
     }
 
