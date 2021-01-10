@@ -278,6 +278,38 @@ public class CodeGenerator extends Visitor<String> {
         addCommand(".end method");
     }
 
+    private String shortCircuit(BinaryExpression binaryExpression) {
+        String commands = "";
+        String scopeLabel = getNewLabel();
+        String jumpExpression = String.format("jumpExpression_%s", scopeLabel);
+        String endExpression = String.format("endExpression_%s", scopeLabel);
+
+        Expression firstOperand = binaryExpression.getFirstOperand();
+        Expression secondOperand = binaryExpression.getSecondOperand();
+        BinaryOperator binaryOperator = binaryExpression.getBinaryOperator();
+
+        commands += String.format("%s\n", firstOperand.accept(this));
+        if (binaryOperator == BinaryOperator.and) {
+            commands += String.format("ifeq %s\n", jumpExpression);
+        } else { // BinaryOperator.or
+            commands += String.format("ifne %s\n", jumpExpression);
+        }
+
+        commands += String.format("%s\n", secondOperand.accept(this));
+        commands += String.format("goto %s\n", endExpression);
+
+        commands += String.format("%s:\n", jumpExpression);
+        if (binaryOperator == BinaryOperator.and) {
+            commands += "iconst_0\n";
+        } else { // BinaryOperator.or
+            commands += "iconst_1\n";
+        }
+
+        commands += String.format("%s:\n", endExpression);
+
+        return commands;
+    }
+
     @Override
     public String visit(Program program) {
         for (ClassDeclaration classDeclaration : program.getClasses()) {
@@ -525,20 +557,25 @@ public class CodeGenerator extends Visitor<String> {
     public String visit(BinaryExpression binaryExpression) {
         BinaryOperator operator = binaryExpression.getBinaryOperator();
         String commands = "";
+
+        if (!(operator == BinaryOperator.or || operator == BinaryOperator.and || operator == BinaryOperator.assign)) {
+            commands += String.format("%s\n", binaryExpression.getFirstOperand().accept(this));
+            commands += String.format("%s\n", binaryExpression.getSecondOperand().accept(this));
+        }
         if (operator == BinaryOperator.add) {
-            //todo
+            commands += "iadd\n";
         }
         else if (operator == BinaryOperator.sub) {
-            //todo
+            commands += "isub\n";
         }
         else if (operator == BinaryOperator.mult) {
-            //todo
+            commands += "imul\n";
         }
         else if (operator == BinaryOperator.div) {
-            //todo
+            commands += "idiv\n";
         }
         else if (operator == BinaryOperator.mod) {
-            //todo
+            commands += "irem\n";
         }
         else if((operator == BinaryOperator.gt) || (operator == BinaryOperator.lt)) {
             //todo
@@ -547,10 +584,10 @@ public class CodeGenerator extends Visitor<String> {
             //todo
         }
         else if(operator == BinaryOperator.and) {
-            //todo
+            commands += shortCircuit(binaryExpression);
         }
         else if(operator == BinaryOperator.or) {
-            //todo
+            commands += shortCircuit(binaryExpression);
         }
         else if(operator == BinaryOperator.assign) {
             Type firstType = binaryExpression.getFirstOperand().accept(expressionTypeChecker);

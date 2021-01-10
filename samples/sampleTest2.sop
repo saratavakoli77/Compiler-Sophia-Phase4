@@ -6,7 +6,7 @@ class A{
 }
 class Main{
     def Main() {
-        if (false) {
+        if (true || false) {
             print("then");
         } else {
             print("else");
