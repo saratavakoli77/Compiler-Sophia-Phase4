@@ -32,6 +32,7 @@ import main.symbolTable.exceptions.ItemNotFoundException;
 import main.symbolTable.items.ClassSymbolTableItem;
 import main.symbolTable.items.FieldSymbolTableItem;
 import main.symbolTable.utils.graph.Graph;
+import main.symbolTable.utils.stack.Stack;
 import main.visitor.Visitor;
 import main.visitor.typeChecker.ExpressionTypeChecker;
 
@@ -45,12 +46,16 @@ public class CodeGenerator extends Visitor<String> {
     private ClassDeclaration currentClass;
     private MethodDeclaration currentMethod;
     private int globalCounter;
+    private Stack<String> breakLabelStack;
+    private Stack<String> continueLabelStack;
 
     public CodeGenerator(Graph<String> classHierarchy) {
         this.classHierarchy = classHierarchy;
         this.expressionTypeChecker = new ExpressionTypeChecker(classHierarchy);
         this.prepareOutputFolder();
         this.globalCounter = 0;
+        this.breakLabelStack = new Stack<>();
+        this.continueLabelStack = new Stack<>();
     }
 
     private void prepareOutputFolder() {
@@ -457,13 +462,13 @@ public class CodeGenerator extends Visitor<String> {
 
     @Override
     public String visit(BreakStmt breakStmt) {
-        //todo
+        addCommand(String.format("goto %s", breakLabelStack.pop()));
         return null;
     }
 
     @Override
     public String visit(ContinueStmt continueStmt) {
-        //todo
+        addCommand(String.format("goto %s", continueLabelStack.pop()));
         return null;
     }
 
@@ -475,7 +480,44 @@ public class CodeGenerator extends Visitor<String> {
 
     @Override
     public String visit(ForStmt forStmt) {
-        //todo
+        String scopeLabel = getNewLabel();
+
+        String ForStmt = String.format("forStmt_%s", scopeLabel);
+        String endFor = String.format("endFor_%s", scopeLabel);
+
+        Statement initialize = forStmt.getInitialize();
+        if (initialize != null) {
+            initialize.accept(this);
+        }
+
+        continueLabelStack.push(ForStmt);
+        breakLabelStack.push(endFor);
+
+        addCommand(String.format("%s:", ForStmt));
+
+        Expression condition = forStmt.getCondition();
+        if (condition != null) {
+            condition.accept(this);
+        }
+
+        addCommand(String.format("ifeq %s", endFor));
+
+        Statement body = forStmt.getBody();
+        if (body != null) {
+            body.accept(this);
+        }
+
+        Statement update = forStmt.getUpdate();
+        if (update != null) {
+            update.accept(this);
+        }
+
+        addCommand(String.format("goto %s", ForStmt));
+        addCommand(String.format("%s:", endFor));
+
+        continueLabelStack.pop();
+        breakLabelStack.pop();
+
         return null;
     }
 
