@@ -1,0 +1,17 @@
+class A{
+    a: int;
+    def A() {
+
+    }
+}
+class Main{
+    def Main() {
+    a: int;
+    b: string;
+
+    print(a);
+    print(b);
+    //print(1);
+
+    }
+}

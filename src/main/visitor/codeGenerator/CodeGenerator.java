@@ -34,7 +34,6 @@ import main.symbolTable.items.FieldSymbolTableItem;
 import main.symbolTable.utils.graph.Graph;
 import main.visitor.Visitor;
 import main.visitor.typeChecker.ExpressionTypeChecker;
-//import utilities.codeGenerationUtilityClasses.*;
 
 import java.io.*;
 
@@ -109,22 +108,7 @@ public class CodeGenerator extends Visitor<String> {
         } catch (IOException e) {}
     }
 
-//    private String makeTypeSignature(Type t) {
-//        if (t instanceof IntType)
-//            return "I";
-//        else if (t instanceof ListType) //todo: is it ok?
-//            return "[I";
-//        else if (t instanceof BoolType)
-//            return "Z";
-//        else if (t instanceof StringType)
-//            return "Ljava/lang/String;";
-//        else if (t instanceof ClassType)
-//            return String.format("L%s;", ((ClassType) t).getClassName().getName());
-//        else
-//            return "ERROR Type";
-//        //todo fptrType
-//    }
-
+    // Sophia Type -> Java Object
     private String makeTypeSignature(Type t) {
         if (t instanceof IntType)
             return "Ljava/lang/Integer;";
@@ -141,6 +125,25 @@ public class CodeGenerator extends Visitor<String> {
         //todo fptrType
     }
 
+    // Sophia Type -> Java Primitive
+    private String getPrimitiveType(Type t) {
+        if (t instanceof IntType)
+            return "I";
+        else if (t instanceof BoolType)
+            return "Z";
+        else
+            return makeTypeSignature(t);
+    }
+
+    private String convertJavaObjToPrimitive(Type t) {
+        if (t instanceof IntType) {
+            return "invokevirtual java/lang/Integer/intValue()I";
+        } else if (t instanceof BoolType) {
+            return "invokevirtual java/lang/Boolean/booleanValue()Z";
+        }
+        return "";
+    }
+
     private String makeReturnTypeSignature(MethodDeclaration methodDeclaration) {
         if (methodDeclaration.getReturnType() instanceof NullType) {
             return "V";
@@ -149,24 +152,24 @@ public class CodeGenerator extends Visitor<String> {
         }
     }
 
-    private String putInitValue(VarDeclaration varDeclaration) {
+    private void putInitValue(VarDeclaration varDeclaration) {
         Type varType = varDeclaration.getType();
         //addCommand("aload_0"); //todo: should it be here? or just in addDefaultConstructor
-        if (varType instanceof IntType || varType instanceof BoolType) {
-            addCommand("iconst_0");
-            return "istore";
+        if (varType instanceof IntType) {
+            addCommand("ldc 0");
+            addCommand("invokestatic java/lang/Integer/valueOf(I)Ljava/lang/Integer;");
+        } else if (varType instanceof BoolType) {
+            addCommand("ldc 0");
+            addCommand("invokestatic java/lang/Boolean/valueOf(Z)Ljava/lang/Boolean;");
         } else if (varType instanceof StringType) {
             addCommand("ldc \"\"");
-            return "astore";
         } else if (varType instanceof FptrType || varType instanceof ClassType) {
             addCommand("aconst_null");
-            return "astore";
         } else if (varType instanceof ListType) {
             //todo: how to add new List?
 
-            return "astore";
+            //return "astore";
         }
-        return "";
     }
 
     private void addStackLocalSize() {
@@ -187,7 +190,7 @@ public class CodeGenerator extends Visitor<String> {
                             "putfield %s/%s %s",
                             currentClass.getClassName().getName(),
                             varDec.getVarName().getName(),
-                            varDec.getType()
+                            makeTypeSignature(varDec.getType())
                     )
             );
         }
@@ -332,12 +335,10 @@ public class CodeGenerator extends Visitor<String> {
         }
 
         addStackLocalSize();
-        //addCommand(";in visit MethodDeclaration");
         addCommand("aload 0");
 
         if (methodDeclaration instanceof ConstructorDeclaration) {
             callParentConstructor();
-            //addCommand("aload_0");
             initializeFields();
         }
 
@@ -361,8 +362,8 @@ public class CodeGenerator extends Visitor<String> {
 
     @Override
     public String visit(VarDeclaration varDeclaration) {
-        String storeCommand = putInitValue(varDeclaration);
-        addCommand(String.format("%s %d", storeCommand, slotOf(varDeclaration.getVarName().getName())));
+        putInitValue(varDeclaration);
+        addCommand(String.format("%s %d", "astore", slotOf(varDeclaration.getVarName().getName())));
         return null;
     }
 
@@ -395,12 +396,13 @@ public class CodeGenerator extends Visitor<String> {
     @Override
     public String visit(PrintStmt print) {
         Expression arg = print.getArg();
-        addCommand("getstatic java/lang/System/out Ljava/io/PrintStream");
+        addCommand("getstatic java/lang/System/out Ljava/io/PrintStream;");
 
         Type argType = arg.accept(expressionTypeChecker);
+        addCommand(arg.accept(this));
         addCommand(
                 String.format("invokevirtual java/io/PrintStream/println(%s)V",
-                        makeTypeSignature(argType)
+                        getPrimitiveType(argType)
                 )
         );
         return null;
@@ -587,7 +589,15 @@ public class CodeGenerator extends Visitor<String> {
     @Override
     public String visit(Identifier identifier) {
         String commands = "";
-        //todo
+
+        int slotNumber = slotOf(identifier.getName());
+        Type type = identifier.accept(expressionTypeChecker);
+        String primitiveTypeConverter = convertJavaObjToPrimitive(type);
+        commands += String.format("aload_%d\n", slotNumber);
+        commands += !primitiveTypeConverter.equals("") ?
+                    String.format("%s\n", primitiveTypeConverter) :
+                    "";
+
         return commands;
     }
 
@@ -614,9 +624,7 @@ public class CodeGenerator extends Visitor<String> {
 
     @Override
     public String visit(ThisClass thisClass) {
-        String commands = "";
-        //todo
-        return commands;
+        return "aload 0\n";
     }
 
     @Override
@@ -628,30 +636,26 @@ public class CodeGenerator extends Visitor<String> {
 
     @Override
     public String visit(NullValue nullValue) {
-        String commands = "";
-        //todo
-        return commands;
+        return "aconst_null\n";
     }
 
     @Override
     public String visit(IntValue intValue) {
-        String commands = "";
-        //todo
-        return commands;
+        return String.format("ldc %d\n", intValue.getConstant());
     }
 
     @Override
     public String visit(BoolValue boolValue) {
-        String commands = "";
-        //todo
-        return commands;
+        int value = 0;
+        if (boolValue.getConstant()) {
+            value = 1;
+        }
+        return String.format("ldc %d\n", value);
     }
 
     @Override
     public String visit(StringValue stringValue) {
-        String commands = "";
-        //todo
-        return commands;
+        return String.format("ldc \"%s\"\n", stringValue.getConstant());
     }
 
 }
