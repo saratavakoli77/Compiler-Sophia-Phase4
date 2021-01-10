@@ -28,7 +28,6 @@ import main.ast.types.single.BoolType;
 import main.ast.types.single.ClassType;
 import main.ast.types.single.IntType;
 import main.ast.types.single.StringType;
-import main.compileErrorException.CompileErrorException;
 import main.symbolTable.SymbolTable;
 import main.symbolTable.exceptions.ItemNotFoundException;
 import main.symbolTable.items.ClassSymbolTableItem;
@@ -51,6 +50,7 @@ public class CodeGenerator extends Visitor<String> {
     private int globalCounter;
     private Stack<String> breakLabelStack;
     private Stack<String> continueLabelStack;
+    private int tempSlotInCurrentMethod;
 
     public CodeGenerator(Graph<String> classHierarchy) {
         this.classHierarchy = classHierarchy;
@@ -59,6 +59,7 @@ public class CodeGenerator extends Visitor<String> {
         this.globalCounter = 0;
         this.breakLabelStack = new Stack<>();
         this.continueLabelStack = new Stack<>();
+        this.tempSlotInCurrentMethod = 0;
     }
 
     private void prepareOutputFolder() {
@@ -168,6 +169,7 @@ public class CodeGenerator extends Visitor<String> {
     }
 
     private void putInitValue(Type varType) {
+        addCommand("; --- init values ---");
         //addCommand("aload_0"); //todo: should it be here? or just in addDefaultConstructor
         if (varType instanceof IntType) {
             addCommand("ldc 0");
@@ -183,14 +185,22 @@ public class CodeGenerator extends Visitor<String> {
             addCommand("new java/util/ArrayList");
             addCommand("dup");
             addCommand("invokespecial java/util/ArrayList/<init>()V");
+            int tempSlot = slotOf("");
+            addCommand(String.format("astore %d", tempSlot));
             ArrayList<ListNameType> listElements = ((ListType) varType).getElementsTypes();
             for (ListNameType listElement : listElements) {
+                addCommand(String.format("aload %d", tempSlot));
+                addCommand(";--- recursion call");
                 putInitValue(listElement.getType());
                 addCommand("invokevirtual java/util/ArrayList/add(Ljava/lang/Object;)Z");
             }
+            addCommand("new List");
+            addCommand("dup");
+            addCommand(String.format("aload %d", tempSlot));
             addCommand("invokespecial List/<init>(Ljava/util/ArrayList;)V");
-            //return "astore";
         }
+        addCommand("");
+        addCommand("");
     }
 
     private void addStackLocalSize() {
@@ -205,6 +215,8 @@ public class CodeGenerator extends Visitor<String> {
     private void initializeFields() {
         for (FieldDeclaration fieldDeclaration : currentClass.getFields()) {
             VarDeclaration varDec = fieldDeclaration.getVarDeclaration();
+            addCommand("aload 0");
+            addCommand(";--- initializeFields call");
             putInitValue(varDec.getType());
             addCommand(
                     String.format(
@@ -254,7 +266,8 @@ public class CodeGenerator extends Visitor<String> {
         }
 
         if (identifier.equals("")) {
-            return index;
+            this.tempSlotInCurrentMethod ++;
+            return tempSlotInCurrentMethod;
         }
         return index;
     }
@@ -273,7 +286,6 @@ public class CodeGenerator extends Visitor<String> {
     private void methodBodyVisitor(MethodDeclaration methodDeclaration) {
         for (VarDeclaration localVar: methodDeclaration.getLocalVars()) {
             localVar.accept(this);
-            putInitValue(localVar.getType());
         }
 
         for (Statement statement: methodDeclaration.getBody()) {
@@ -371,7 +383,8 @@ public class CodeGenerator extends Visitor<String> {
 
         if (classDeclaration.getConstructor() != null) {
             this.expressionTypeChecker.setCurrentMethod(classDeclaration.getConstructor());
-            currentMethod = classDeclaration.getConstructor();
+            this.currentMethod = classDeclaration.getConstructor();
+            this.tempSlotInCurrentMethod = 0;
             classDeclaration.getConstructor().accept(this);
         } else {
             addDefaultConstructor();
@@ -380,6 +393,7 @@ public class CodeGenerator extends Visitor<String> {
         for (MethodDeclaration methodDeclaration : classDeclaration.getMethods()) {
             this.expressionTypeChecker.setCurrentMethod(methodDeclaration);
             this.currentMethod = methodDeclaration;
+            this.tempSlotInCurrentMethod = 0;
             methodDeclaration.accept(this);
         }
 
@@ -441,6 +455,7 @@ public class CodeGenerator extends Visitor<String> {
 
     @Override
     public String visit(VarDeclaration varDeclaration) {
+        addCommand(";--- VarDeclaration call");
         putInitValue(varDeclaration.getType());
         addCommand(String.format("%s %d", "astore", slotOf(varDeclaration.getVarName().getName())));
         return null;
@@ -779,8 +794,11 @@ public class CodeGenerator extends Visitor<String> {
         commands.append("new java/util/ArrayList\n");
         commands.append("dup\n");
         commands.append("invokespecial java/util/ArrayList/<init>()V\n");
+        int tempSlot = slotOf("");
+        commands.append(String.format("astore %d\n", tempSlot));
         ArrayList<Expression> listElements = listValue.getElements();
         for (Expression listElement : listElements) {
+            commands.append(String.format("aload %d\n", tempSlot));
             commands.append(listElement.accept(this));
             Type elementType = listElement.accept(expressionTypeChecker);
             String primitiveTypeConverter = convertJavaObjToPrimitive(elementType);
@@ -791,6 +809,9 @@ public class CodeGenerator extends Visitor<String> {
                     );
             commands.append("invokevirtual java/util/ArrayList/add(Ljava/lang/Object;)Z\n");
         }
+        commands.append("new List\n");
+        commands.append("dup\n");
+        commands.append(String.format("aload %d\n", tempSlot));
         commands.append("invokespecial List/<init>(Ljava/util/ArrayList;)V\n");
         return commands.toString();
     }

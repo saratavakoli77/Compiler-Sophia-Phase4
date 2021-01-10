@@ -1,18 +1,11 @@
-//class A{
-//    a: int;
-//    def A() {
-//        print("hello");
-//    }
-//}
+class A{
+    a: int;
+    def A() {
+
+    }
+}
 class Main{
-    //def void test(m: string, s: int) {
-        //a: int;
-        //b: A;
-    //}
     def Main() {
-        print("hello world!");
-        print(1);
-        print(true);
 
     }
 }

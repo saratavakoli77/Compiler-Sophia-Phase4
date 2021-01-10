@@ -1,16 +1,6 @@
-class A{
-    a: int;
-    def A() {
-
-    }
-}
 class Main{
     def Main() {
-        if (true || false) {
-            print("then");
-        } else {
-            print("else");
-        }
+        order: list(int);
 
     }
 }
