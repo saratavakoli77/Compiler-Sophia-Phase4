@@ -44,11 +44,13 @@ public class CodeGenerator extends Visitor<String> {
     private FileWriter currentFile;
     private ClassDeclaration currentClass;
     private MethodDeclaration currentMethod;
+    private int globalCounter;
 
     public CodeGenerator(Graph<String> classHierarchy) {
         this.classHierarchy = classHierarchy;
         this.expressionTypeChecker = new ExpressionTypeChecker(classHierarchy);
         this.prepareOutputFolder();
+        this.globalCounter = 0;
     }
 
     private void prepareOutputFolder() {
@@ -106,6 +108,10 @@ public class CodeGenerator extends Visitor<String> {
                 this.currentFile.write("\t\t" + command + "\n");
             this.currentFile.flush();
         } catch (IOException e) {}
+    }
+
+    private String getNewLabel() {
+        return Integer.toString(globalCounter ++);
     }
 
     // Sophia Type -> Java Object
@@ -383,7 +389,32 @@ public class CodeGenerator extends Visitor<String> {
 
     @Override
     public String visit(ConditionalStmt conditionalStmt) {
-        //todo
+        String scopeLabel = getNewLabel();
+        String thenStmt = String.format("thenStmt_%s", scopeLabel);
+        String elseStmt = String.format("elseStmt_%s", scopeLabel);
+        String afterStmt = String.format("afterStmt_%s", scopeLabel);
+
+        Expression condition = conditionalStmt.getCondition();
+        addCommand(condition.accept(this));
+
+        addCommand(String.format("ifeq %s", elseStmt));
+        addCommand(String.format("%s:", thenStmt));
+
+        Statement thenBody = conditionalStmt.getThenBody();
+        if (thenBody != null) {
+            thenBody.accept(this);
+        }
+
+        addCommand(String.format("goto %s", afterStmt));
+        addCommand(String.format("%s:", elseStmt));
+
+        Statement elseBody = conditionalStmt.getElseBody();
+        if (elseBody != null) {
+            elseBody.accept(this);
+        }
+
+        addCommand(String.format("%s:", afterStmt));
+
         return null;
     }
 

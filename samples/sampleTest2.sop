@@ -6,12 +6,11 @@ class A{
 }
 class Main{
     def Main() {
-    a: int;
-    b: string;
-
-    print(a);
-    print(b);
-    //print(1);
+        if (false) {
+            print("then");
+        } else {
+            print("else");
+        }
 
     }
 }
