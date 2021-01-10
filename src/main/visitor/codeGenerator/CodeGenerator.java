@@ -27,6 +27,7 @@ import main.ast.types.single.BoolType;
 import main.ast.types.single.ClassType;
 import main.ast.types.single.IntType;
 import main.ast.types.single.StringType;
+import main.compileErrorException.CompileErrorException;
 import main.symbolTable.SymbolTable;
 import main.symbolTable.exceptions.ItemNotFoundException;
 import main.symbolTable.items.ClassSymbolTableItem;
@@ -37,6 +38,7 @@ import main.visitor.Visitor;
 import main.visitor.typeChecker.ExpressionTypeChecker;
 
 import java.io.*;
+import java.util.ArrayList;
 
 public class CodeGenerator extends Visitor<String> {
     ExpressionTypeChecker expressionTypeChecker;
@@ -310,6 +312,32 @@ public class CodeGenerator extends Visitor<String> {
         return commands;
     }
 
+    private String compareExpressions(String operator, String cmd) {
+        String scopeLabel = getNewLabel();
+        String commands = "";
+        String operatorBegin = String.format("%s_%s", operator, scopeLabel);
+        String operatorEnd = String.format("end_%s_%s", operator, scopeLabel);
+        String expEnd = String.format("end_exp_%s", scopeLabel);
+
+        commands += String.format("if_%s%s %s\n", cmd, operator, operatorEnd);
+        commands += String.format("%s:\n", operatorBegin);
+        commands += "iconst_0\n";
+        commands += String.format("goto %s\n", expEnd);
+        commands += String.format("%s:\n", operatorEnd);
+        commands += "iconst_1\n";
+        commands += String.format("%s:\n", expEnd);
+
+        return commands;
+    }
+
+    private String equalityExpressions(Expression expression, String operator) {
+        Type expType = expression.accept(expressionTypeChecker);
+        if (expType instanceof IntType || expType instanceof BoolType) {
+            return compareExpressions(operator, "icmp");
+        }
+        return compareExpressions(operator, "acmp");
+    }
+
     @Override
     public String visit(Program program) {
         for (ClassDeclaration classDeclaration : program.getClasses()) {
@@ -578,10 +606,10 @@ public class CodeGenerator extends Visitor<String> {
             commands += "irem\n";
         }
         else if((operator == BinaryOperator.gt) || (operator == BinaryOperator.lt)) {
-            //todo
+            commands += compareExpressions(operator.toString(), "icmp");
         }
         else if((operator == BinaryOperator.eq) || (operator == BinaryOperator.neq)) {
-            //todo
+            commands += equalityExpressions(binaryExpression.getFirstOperand(), operator.toString());
         }
         else if(operator == BinaryOperator.and) {
             commands += shortCircuit(binaryExpression);
@@ -739,9 +767,24 @@ public class CodeGenerator extends Visitor<String> {
 
     @Override
     public String visit(ListValue listValue) {
-        String commands = "";
-        //todo
-        return commands;
+        StringBuilder commands = new StringBuilder();
+        commands.append("new java/util/ArrayList\n");
+        commands.append("dup\n");
+        commands.append("invokespecial java/util/ArrayList/<init>()V\n");
+        ArrayList<Expression> listElements = listValue.getElements();
+        for (Expression listElement : listElements) {
+            commands.append(listElement.accept(this));
+            Type elementType = listElement.accept(expressionTypeChecker);
+            String primitiveTypeConverter = convertJavaObjToPrimitive(elementType);
+            commands.append(
+                        !primitiveTypeConverter.equals("") ?
+                        String.format("%s\n", primitiveTypeConverter) :
+                        ""
+                    );
+            commands.append("invokevirtual java/util/ArrayList/add(Ljava/lang/Object;)Z\n");
+        }
+        commands.append("invokespecial List/<init>(Ljava/util/ArrayList;)V\n");
+        return commands.toString();
     }
 
     @Override
