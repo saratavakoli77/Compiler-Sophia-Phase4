@@ -22,6 +22,7 @@ import main.ast.nodes.statement.loop.ForeachStmt;
 import main.ast.types.NullType;
 import main.ast.types.Type;
 import main.ast.types.functionPointer.FptrType;
+import main.ast.types.list.ListNameType;
 import main.ast.types.list.ListType;
 import main.ast.types.single.BoolType;
 import main.ast.types.single.ClassType;
@@ -126,16 +127,17 @@ public class CodeGenerator extends Visitor<String> {
         if (t instanceof IntType)
             return "Ljava/lang/Integer;";
         else if (t instanceof ListType) //todo: is it ok?
-            return "[I";
+            return "LList;";
         else if (t instanceof BoolType)
             return "Ljava/lang/Boolean;";
         else if (t instanceof StringType)
             return "Ljava/lang/String;";
         else if (t instanceof ClassType)
             return String.format("L%s;", ((ClassType) t).getClassName().getName());
+        else if (t instanceof FptrType)
+            return "LFptr;";
         else
             return "ERROR Type";
-        //todo fptrType
     }
 
     // Sophia Type -> Java Primitive
@@ -165,8 +167,7 @@ public class CodeGenerator extends Visitor<String> {
         }
     }
 
-    private void putInitValue(VarDeclaration varDeclaration) {
-        Type varType = varDeclaration.getType();
+    private void putInitValue(Type varType) {
         //addCommand("aload_0"); //todo: should it be here? or just in addDefaultConstructor
         if (varType instanceof IntType) {
             addCommand("ldc 0");
@@ -179,8 +180,15 @@ public class CodeGenerator extends Visitor<String> {
         } else if (varType instanceof FptrType || varType instanceof ClassType) {
             addCommand("aconst_null");
         } else if (varType instanceof ListType) {
-            //todo: how to add new List?
-
+            addCommand("new java/util/ArrayList");
+            addCommand("dup");
+            addCommand("invokespecial java/util/ArrayList/<init>()V");
+            ArrayList<ListNameType> listElements = ((ListType) varType).getElementsTypes();
+            for (ListNameType listElement : listElements) {
+                putInitValue(listElement.getType());
+                addCommand("invokevirtual java/util/ArrayList/add(Ljava/lang/Object;)Z");
+            }
+            addCommand("invokespecial List/<init>(Ljava/util/ArrayList;)V");
             //return "astore";
         }
     }
@@ -197,7 +205,7 @@ public class CodeGenerator extends Visitor<String> {
     private void initializeFields() {
         for (FieldDeclaration fieldDeclaration : currentClass.getFields()) {
             VarDeclaration varDec = fieldDeclaration.getVarDeclaration();
-            putInitValue(varDec);
+            putInitValue(varDec.getType());
             addCommand(
                     String.format(
                             "putfield %s/%s %s",
@@ -265,7 +273,7 @@ public class CodeGenerator extends Visitor<String> {
     private void methodBodyVisitor(MethodDeclaration methodDeclaration) {
         for (VarDeclaration localVar: methodDeclaration.getLocalVars()) {
             localVar.accept(this);
-            putInitValue(localVar);
+            putInitValue(localVar.getType());
         }
 
         for (Statement statement: methodDeclaration.getBody()) {
@@ -433,7 +441,7 @@ public class CodeGenerator extends Visitor<String> {
 
     @Override
     public String visit(VarDeclaration varDeclaration) {
-        putInitValue(varDeclaration);
+        putInitValue(varDeclaration.getType());
         addCommand(String.format("%s %d", "astore", slotOf(varDeclaration.getVarName().getName())));
         return null;
     }
