@@ -692,8 +692,11 @@ public class CodeGenerator extends Visitor<String> {
             Type secondType = binaryExpression.getSecondOperand().accept(expressionTypeChecker);
             String secondOperandCommands = binaryExpression.getSecondOperand().accept(this);
             if(firstType instanceof ListType) {
-                //todo make new list with List copy constructor with the second operand commands
-                // (add these commands to secondOperandCommands)
+                int newSlot = slotOf("");
+                secondOperandCommands += String.format("astore %d\n", newSlot);
+                secondOperandCommands += (getNewList());
+                secondOperandCommands += String.format("aload %d\n", newSlot);
+                secondOperandCommands += "invokespecial List/<init>(LList;)V\n";
             }
             if(binaryExpression.getFirstOperand() instanceof Identifier) {
                 secondOperandCommands += ConvertPrimitiveToJavaObj(secondType);
@@ -980,12 +983,8 @@ public class CodeGenerator extends Visitor<String> {
             commands.append(String.format("aload %d\n", tempSlot));
             commands.append(listElement.accept(this));
             Type elementType = listElement.accept(expressionTypeChecker);
-            String primitiveTypeConverter = convertJavaObjToPrimitive(elementType);
-            commands.append(
-                        !primitiveTypeConverter.equals("") ?
-                        String.format("%s\n", primitiveTypeConverter) :
-                        ""
-                    );
+            commands.append(ConvertPrimitiveToJavaObj(elementType));
+            commands.append("\n");
             commands.append("invokevirtual java/util/ArrayList/add(Ljava/lang/Object;)Z\n");
             commands.append("pop\n");
         }

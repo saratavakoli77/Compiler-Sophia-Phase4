@@ -1,13 +1,8 @@
 class Main{
-    a: int;
     def Main() {
         l: list(t: int, u: bool);
-        this.a = 4;
-        print(this.a);
-        l.t = 9;
-        l.u = true;
-        print(l.u);
-        print(l.t);
-
+        l = [1, true];
+        print(l[0]);
+        print(l[1]);
     }
 }
