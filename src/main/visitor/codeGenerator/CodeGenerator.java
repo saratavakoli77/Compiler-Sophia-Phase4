@@ -33,10 +33,10 @@ import main.symbolTable.exceptions.ItemNotFoundException;
 import main.symbolTable.items.ClassSymbolTableItem;
 import main.symbolTable.items.FieldSymbolTableItem;
 import main.symbolTable.utils.graph.Graph;
-import main.symbolTable.utils.stack.Stack;
+//import main.symbolTable.utils.stack.Stack;
 import main.visitor.Visitor;
 import main.visitor.typeChecker.ExpressionTypeChecker;
-
+import java.util.Stack;
 import java.io.*;
 import java.util.ArrayList;
 
@@ -611,13 +611,13 @@ public class CodeGenerator extends Visitor<String> {
 
     @Override
     public String visit(BreakStmt breakStmt) {
-        addCommand(String.format("goto %s", breakLabelStack.pop()));
+        addCommand(String.format("goto %s", breakLabelStack.peek()));
         return null;
     }
 
     @Override
     public String visit(ContinueStmt continueStmt) {
-        addCommand(String.format("goto %s", continueLabelStack.pop()));
+        addCommand(String.format("goto %s", continueLabelStack.peek()));
         return null;
     }
 
@@ -646,7 +646,7 @@ public class CodeGenerator extends Visitor<String> {
 
         Expression condition = forStmt.getCondition();
         if (condition != null) {
-            condition.accept(this);
+            addCommand(condition.accept(this));
         }
 
         addCommand(String.format("ifeq %s", endFor));

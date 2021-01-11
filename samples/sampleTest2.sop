@@ -1,9 +1,25 @@
 class Main{
-    def int test1(a:int, b:int) {
-        return a + b;
-    }
     def Main() {
-        //print(this.test1(44));
-        print(this.test1(6, 8));
+        i: int;
+        j: int;
+        //i = 0;
+        //if (i < 5) {
+
+        //}
+        for (i = 0; i < 5; i = i+1) {
+            for (j = 0; j < 5; j = j+1) {
+                print(j);
+                if (j == 1) {
+                    print("ey baba");
+                    break;
+                }
+
+            }
+            if (i == 2) {
+                print("i break");
+                break;
+            }
+        }
+        print("here");
     }
 }
