@@ -37,7 +37,6 @@ import main.symbolTable.utils.stack.Stack;
 import main.visitor.Visitor;
 import main.visitor.typeChecker.ExpressionTypeChecker;
 
-import javax.print.attribute.standard.Fidelity;
 import java.io.*;
 import java.util.ArrayList;
 
@@ -395,6 +394,26 @@ public class CodeGenerator extends Visitor<String> {
             return compareExpressions(operator, "icmp");
         }
         return compareExpressions(operator, "acmp");
+    }
+
+    private String notOperator() {
+        String commands = "";
+
+        String scopeLabel = getNewLabel();
+
+        String setTrue = String.format("setTrue_%s", scopeLabel);
+        String scopeEnd = String.format("end_notOp_%s", scopeLabel);
+
+        commands += (String.format("\tifeq %s", setTrue));
+        commands += ("\ticonst_0");
+        commands += (String.format("\tgoto %s", scopeEnd));
+
+        commands += (String.format("%s:", setTrue));
+        commands += ("\ticonst_1");
+
+        commands += (String.format("%s:", scopeEnd));
+
+        return commands;
     }
 
     @Override
@@ -763,10 +782,10 @@ public class CodeGenerator extends Visitor<String> {
         UnaryOperator operator = unaryExpression.getOperator();
         String commands = "";
         if(operator == UnaryOperator.minus) {
-            //todo
+            commands += "ineg\n";
         }
         else if(operator == UnaryOperator.not) {
-            //todo
+            commands += notOperator();
         }
         else if((operator == UnaryOperator.predec) || (operator == UnaryOperator.preinc)) {
             if(unaryExpression.getOperand() instanceof Identifier) {
