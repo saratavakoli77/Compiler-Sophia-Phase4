@@ -707,6 +707,8 @@ public class CodeGenerator extends Visitor<String> {
                 ListAccessByIndex first = (ListAccessByIndex) binaryExpression.getFirstOperand();
                 commands += first.getInstance().accept(this);
                 commands += first.getIndex().accept(this);
+                secondOperandCommands += ConvertPrimitiveToJavaObj(secondType);
+                secondOperandCommands += "\n";
                 commands += secondOperandCommands;
                 commands += "invokevirtual List/setElement(ILjava/lang/Object;)V\n";
                 commands += binaryExpression.getFirstOperand().accept(this);

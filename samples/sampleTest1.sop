@@ -1,9 +1,12 @@
 class Main{
     def Main() {
-        a: int;
-        b: int;
-        b = 7;
-        a = 6;
-        print(a+b);
+        a: list(b:int, c:bool);
+        l: list(3 # int);
+        a[0] = 5;
+        a[1] = true;
+        print(a[0]);
+        print(a[1]);
+        l[1+1] = 4;
+        print(l[2]);
     }
 }
