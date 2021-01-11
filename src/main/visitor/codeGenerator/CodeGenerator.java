@@ -168,6 +168,37 @@ public class CodeGenerator extends Visitor<String> {
         }
     }
 
+    private String getNewArrayList() {
+        String commands = "";
+        commands += "new java/util/ArrayList\n";
+        commands += "dup\n";
+        commands += "invokespecial java/util/ArrayList/<init>()V\n";
+        return commands;
+    }
+
+    private String getNewList() {
+        String commands = "";
+        commands += "new List\n";
+        commands += "dup\n";
+        return commands;
+    }
+
+    private void putInitValueList(ListType varType) {
+        addCommand(getNewArrayList());
+        int tempSlot = slotOf("");
+        addCommand(String.format("astore %d\n", tempSlot));
+        ArrayList<ListNameType> listElements = varType.getElementsTypes();
+        for (ListNameType listElement : listElements) {
+            addCommand(String.format("aload %d", tempSlot));
+            addCommand(";--- recursion call");
+            putInitValue(listElement.getType());
+            addCommand("invokevirtual java/util/ArrayList/add(Ljava/lang/Object;)Z");
+        }
+        addCommand(getNewList());
+        addCommand(String.format("aload %d", tempSlot));
+        addCommand("invokespecial List/<init>(Ljava/util/ArrayList;)V");
+    }
+
     private void putInitValue(Type varType) {
         addCommand("; --- init values ---");
         //addCommand("aload_0"); //todo: should it be here? or just in addDefaultConstructor
@@ -182,22 +213,7 @@ public class CodeGenerator extends Visitor<String> {
         } else if (varType instanceof FptrType || varType instanceof ClassType) {
             addCommand("aconst_null");
         } else if (varType instanceof ListType) {
-            addCommand("new java/util/ArrayList");
-            addCommand("dup");
-            addCommand("invokespecial java/util/ArrayList/<init>()V");
-            int tempSlot = slotOf("");
-            addCommand(String.format("astore %d", tempSlot));
-            ArrayList<ListNameType> listElements = ((ListType) varType).getElementsTypes();
-            for (ListNameType listElement : listElements) {
-                addCommand(String.format("aload %d", tempSlot));
-                addCommand(";--- recursion call");
-                putInitValue(listElement.getType());
-                addCommand("invokevirtual java/util/ArrayList/add(Ljava/lang/Object;)Z");
-            }
-            addCommand("new List");
-            addCommand("dup");
-            addCommand(String.format("aload %d", tempSlot));
-            addCommand("invokespecial List/<init>(Ljava/util/ArrayList;)V");
+            putInitValueList((ListType) varType);
         }
         addCommand("");
         addCommand("");
@@ -791,9 +807,7 @@ public class CodeGenerator extends Visitor<String> {
     @Override
     public String visit(ListValue listValue) {
         StringBuilder commands = new StringBuilder();
-        commands.append("new java/util/ArrayList\n");
-        commands.append("dup\n");
-        commands.append("invokespecial java/util/ArrayList/<init>()V\n");
+        commands.append(getNewArrayList());
         int tempSlot = slotOf("");
         commands.append(String.format("astore %d\n", tempSlot));
         ArrayList<Expression> listElements = listValue.getElements();
@@ -809,8 +823,8 @@ public class CodeGenerator extends Visitor<String> {
                     );
             commands.append("invokevirtual java/util/ArrayList/add(Ljava/lang/Object;)Z\n");
         }
-        commands.append("new List\n");
-        commands.append("dup\n");
+
+        commands.append(getNewList());
         commands.append(String.format("aload %d\n", tempSlot));
         commands.append("invokespecial List/<init>(Ljava/util/ArrayList;)V\n");
         return commands.toString();
