@@ -689,12 +689,15 @@ public class CodeGenerator extends Visitor<String> {
         }
         else if(operator == BinaryOperator.assign) {
             Type firstType = binaryExpression.getFirstOperand().accept(expressionTypeChecker);
+            Type secondType = binaryExpression.getSecondOperand().accept(expressionTypeChecker);
             String secondOperandCommands = binaryExpression.getSecondOperand().accept(this);
             if(firstType instanceof ListType) {
                 //todo make new list with List copy constructor with the second operand commands
                 // (add these commands to secondOperandCommands)
             }
             if(binaryExpression.getFirstOperand() instanceof Identifier) {
+                secondOperandCommands += ConvertPrimitiveToJavaObj(secondType);
+                secondOperandCommands += "\n";
                 commands += secondOperandCommands;
                 int slot = slotOf(((Identifier) binaryExpression.getFirstOperand()).getName());
                 commands += String.format("astore %d\n", slot);
