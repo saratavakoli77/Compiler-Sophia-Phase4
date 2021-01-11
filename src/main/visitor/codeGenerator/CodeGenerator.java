@@ -776,7 +776,7 @@ public class CodeGenerator extends Visitor<String> {
                     commands += objectOrListMemberAccess.getInstance().accept(this);
                     commands += String.format
                                 (
-                                    "\tgetfield %s/%s %s",
+                                    "getfield %s/%s %s",
                                     ((ClassType) instanceType).getClassName().getName(),
                                     memberName,
                                     makeTypeSignature(memberType)
@@ -795,7 +795,20 @@ public class CodeGenerator extends Visitor<String> {
             }
         }
         else if(instanceType instanceof ListType) {
-            //todo
+            commands += objectOrListMemberAccess.getInstance().accept(this);
+            ArrayList<ListNameType> listElements = ((ListType) instanceType).getElementsTypes();
+            int index = 0;
+            for (ListNameType listElement : listElements) {
+                if (listElement.getName().getName().equals(memberName)) {
+                    commands += String.format("ldc %d\n", index);
+                    commands += "invokevirtual List/getElement(I)Ljava/lang/Object;\n";
+                    commands += castObject(listElement.getType());
+                    commands += "\n";
+                    break;
+                }
+                index += 1;
+            }
+
         }
         return commands;
     }
