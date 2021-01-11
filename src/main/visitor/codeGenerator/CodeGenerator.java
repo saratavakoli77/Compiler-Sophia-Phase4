@@ -267,7 +267,7 @@ public class CodeGenerator extends Visitor<String> {
 
         if (identifier.equals("")) {
             this.tempSlotInCurrentMethod ++;
-            return tempSlotInCurrentMethod;
+            return tempSlotInCurrentMethod + index;
         }
         return index;
     }

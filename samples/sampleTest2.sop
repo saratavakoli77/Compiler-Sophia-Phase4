@@ -1,6 +1,11 @@
 class Main{
     def Main() {
+        a: int;
         order: list(int);
-
+        if (a > 1 + 2) {
+            print("then");
+        } else {
+            print("else");
+        }
     }
 }
