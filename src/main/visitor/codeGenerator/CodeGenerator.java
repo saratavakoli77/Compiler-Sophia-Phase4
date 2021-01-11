@@ -37,6 +37,7 @@ import main.symbolTable.utils.stack.Stack;
 import main.visitor.Visitor;
 import main.visitor.typeChecker.ExpressionTypeChecker;
 
+import javax.print.attribute.standard.Fidelity;
 import java.io.*;
 import java.util.ArrayList;
 
@@ -500,7 +501,14 @@ public class CodeGenerator extends Visitor<String> {
 
     @Override
     public String visit(AssignmentStmt assignmentStmt) {
-        //todo
+        BinaryExpression binaryExpression = new BinaryExpression
+                (
+                    assignmentStmt.getlValue(),
+                    assignmentStmt.getrValue(),
+                    BinaryOperator.assign
+                );
+        addCommand(binaryExpression.accept(this));
+        addCommand("pop");
         return null;
     }
 
@@ -687,7 +695,10 @@ public class CodeGenerator extends Visitor<String> {
                 // (add these commands to secondOperandCommands)
             }
             if(binaryExpression.getFirstOperand() instanceof Identifier) {
-                //todo
+                commands += secondOperandCommands;
+                int slot = slotOf(((Identifier) binaryExpression.getFirstOperand()).getName());
+                commands += String.format("astore %d\n", slot);
+                commands += binaryExpression.getFirstOperand().accept(this);
             }
             else if(binaryExpression.getFirstOperand() instanceof ListAccessByIndex) {
                 //todo
