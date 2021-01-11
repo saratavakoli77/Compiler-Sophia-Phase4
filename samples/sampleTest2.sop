@@ -1,11 +1,9 @@
 class Main{
+    def int test1(a:int, b:int) {
+        return a + b;
+    }
     def Main() {
-        a: int;
-        order: list(int);
-        if (a > 1 + 2) {
-            print("then");
-        } else {
-            print("else");
-        }
+        //print(this.test1(44));
+        print(this.test1(6, 8));
     }
 }

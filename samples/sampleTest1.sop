@@ -1,11 +1,6 @@
-class A{
-    a: int;
-    def A() {
-
-    }
-}
 class Main{
     def Main() {
-
+        //a: list(int);
+        print(33);
     }
 }
