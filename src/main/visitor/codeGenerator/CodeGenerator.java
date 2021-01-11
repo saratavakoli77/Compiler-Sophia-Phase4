@@ -719,10 +719,36 @@ public class CodeGenerator extends Visitor<String> {
                 String memberName = ((ObjectOrListMemberAccess) binaryExpression.getFirstOperand()).getMemberName().getName();
                 Type instanceType = instance.accept(expressionTypeChecker);
                 if(instanceType instanceof ListType) {
-                    //todo
+                    commands += instance.accept(this);
+                    ArrayList<ListNameType> listElements = ((ListType) instanceType).getElementsTypes();
+                    int index = 0;
+                    for (ListNameType listElement : listElements) {
+                        if (listElement.getName().getName().equals(memberName)) {
+                            commands += String.format("ldc %d\n", index);
+                            secondOperandCommands += ConvertPrimitiveToJavaObj(secondType);
+                            secondOperandCommands += "\n";
+                            commands += secondOperandCommands;
+                            commands += "invokevirtual List/setElement(ILjava/lang/Object;)V\n";
+                            break;
+                        }
+                        index += 1;
+                    }
+                    commands += binaryExpression.getFirstOperand().accept(this);
                 }
                 else if(instanceType instanceof ClassType) {
-                    //todo
+                    commands += instance.accept(this);
+                    secondOperandCommands += ConvertPrimitiveToJavaObj(secondType);
+                    secondOperandCommands += "\n";
+                    commands += secondOperandCommands;
+                    commands += String.format
+                            (
+                                    "putfield %s/%s %s",
+                                    ((ClassType) instanceType).getClassName().getName(),
+                                    memberName,
+                                    makeTypeSignature(memberType)
+                            );
+                    commands += "\n";
+                    commands += binaryExpression.getFirstOperand().accept(this);
                 }
             }
         }
