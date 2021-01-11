@@ -838,11 +838,19 @@ public class CodeGenerator extends Visitor<String> {
         String commands = "";
         commands += listAccessByIndex.getInstance().accept(this);
         commands += listAccessByIndex.getIndex().accept(this);
+
         commands += "invokevirtual List/getElement(I)Ljava/lang/Object;\n";
         Type instanceType = listAccessByIndex.getInstance().accept(expressionTypeChecker);
-        commands += castObject(instanceType);
+        int typeIndex;
+        if (!(listAccessByIndex.getIndex() instanceof IntValue)) {
+            typeIndex = 0;
+        } else {
+            typeIndex = ((IntValue) listAccessByIndex.getIndex()).getConstant();
+        }
+        Type elementType = ((ListType) instanceType).getElementsTypes().get(typeIndex).getType();
+        commands += castObject(elementType);
         commands += "\n";
-        commands += convertJavaObjToPrimitive(instanceType);
+        commands += convertJavaObjToPrimitive(elementType);
         commands += "\n";
         return commands;
     }
