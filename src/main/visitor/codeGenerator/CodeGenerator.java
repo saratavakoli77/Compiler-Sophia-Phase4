@@ -781,6 +781,9 @@ public class CodeGenerator extends Visitor<String> {
                                     memberName,
                                     makeTypeSignature(memberType)
                                 );
+                    commands += "\n";
+                    commands += convertJavaObjToPrimitive(memberType);
+                    commands += "\n";
                 } catch (ItemNotFoundException memberIsMethod) {
                     int tempSlot = slotOf("");
                     commands += "new Fptr\n";
@@ -803,6 +806,8 @@ public class CodeGenerator extends Visitor<String> {
                     commands += String.format("ldc %d\n", index);
                     commands += "invokevirtual List/getElement(I)Ljava/lang/Object;\n";
                     commands += castObject(listElement.getType());
+                    commands += "\n";
+                    commands += convertJavaObjToPrimitive(listElement.getType());
                     commands += "\n";
                     break;
                 }

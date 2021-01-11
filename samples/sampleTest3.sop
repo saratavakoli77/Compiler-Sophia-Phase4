@@ -1,0 +1,8 @@
+class Main{
+    f: int;
+    def Main() {
+        a : list(b: int);
+        print(a.b);
+        print(this.f);
+    }
+}
