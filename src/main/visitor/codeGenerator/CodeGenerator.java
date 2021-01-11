@@ -738,6 +738,81 @@ public class CodeGenerator extends Visitor<String> {
         return null;
     }
 
+
+    public String assignment(BinaryExpression binaryExpression) {
+        String commands = "";
+
+        Type firstType = binaryExpression.getFirstOperand().accept(expressionTypeChecker);
+        Type secondType = binaryExpression.getSecondOperand().accept(expressionTypeChecker);
+        String secondOperandCommands = binaryExpression.getSecondOperand().accept(this);
+        if(firstType instanceof ListType) {
+            int newSlot = slotOf("");
+            secondOperandCommands += String.format("astore %d\n", newSlot);
+            secondOperandCommands += (getNewList());
+            secondOperandCommands += String.format("aload %d\n", newSlot);
+            secondOperandCommands += "invokespecial List/<init>(LList;)V\n";
+        }
+        if(binaryExpression.getFirstOperand() instanceof Identifier) {
+            secondOperandCommands += ConvertPrimitiveToJavaObj(secondType);
+            secondOperandCommands += "\n";
+            commands += secondOperandCommands;
+            int slot = slotOf(((Identifier) binaryExpression.getFirstOperand()).getName());
+            commands += String.format("astore %d\n", slot);
+            //commands += binaryExpression.getFirstOperand().accept(this);
+        }
+        else if(binaryExpression.getFirstOperand() instanceof ListAccessByIndex) {
+            ListAccessByIndex first = (ListAccessByIndex) binaryExpression.getFirstOperand();
+            commands += first.getInstance().accept(this);
+            commands += first.getIndex().accept(this);
+            secondOperandCommands += ConvertPrimitiveToJavaObj(secondType);
+            secondOperandCommands += "\n";
+            commands += secondOperandCommands;
+            commands += "invokevirtual List/setElement(ILjava/lang/Object;)V\n";
+            //commands += binaryExpression.getFirstOperand().accept(this);
+        }
+        else if(binaryExpression.getFirstOperand() instanceof ObjectOrListMemberAccess) {
+            Expression instance = ((ObjectOrListMemberAccess) binaryExpression.getFirstOperand()).getInstance();
+            Type memberType = binaryExpression.getFirstOperand().accept(expressionTypeChecker);
+            String memberName = ((ObjectOrListMemberAccess) binaryExpression.getFirstOperand()).getMemberName().getName();
+            Type instanceType = instance.accept(expressionTypeChecker);
+            if(instanceType instanceof ListType) {
+                commands += instance.accept(this);
+                ArrayList<ListNameType> listElements = ((ListType) instanceType).getElementsTypes();
+                int index = 0;
+                for (ListNameType listElement : listElements) {
+                    if (listElement.getName().getName().equals(memberName)) {
+                        commands += String.format("ldc %d\n", index);
+                        secondOperandCommands += ConvertPrimitiveToJavaObj(secondType);
+                        secondOperandCommands += "\n";
+                        commands += secondOperandCommands;
+                        commands += "invokevirtual List/setElement(ILjava/lang/Object;)V\n";
+                        break;
+                    }
+                    index += 1;
+                }
+                //commands += binaryExpression.getFirstOperand().accept(this);
+            }
+            else if(instanceType instanceof ClassType) {
+                commands += instance.accept(this);
+                secondOperandCommands += ConvertPrimitiveToJavaObj(secondType);
+                secondOperandCommands += "\n";
+                commands += secondOperandCommands;
+                commands += String.format
+                        (
+                                "putfield %s/%s %s",
+                                ((ClassType) instanceType).getClassName().getName(),
+                                memberName,
+                                makeTypeSignature(memberType)
+                        );
+                commands += "\n";
+                //commands += binaryExpression.getFirstOperand().accept(this);
+            }
+        }
+
+        return commands;
+
+    }
+
     @Override
     public String visit(BinaryExpression binaryExpression) {
         BinaryOperator operator = binaryExpression.getBinaryOperator();
@@ -775,72 +850,8 @@ public class CodeGenerator extends Visitor<String> {
             commands += shortCircuit(binaryExpression);
         }
         else if(operator == BinaryOperator.assign) {
-            Type firstType = binaryExpression.getFirstOperand().accept(expressionTypeChecker);
-            Type secondType = binaryExpression.getSecondOperand().accept(expressionTypeChecker);
-            String secondOperandCommands = binaryExpression.getSecondOperand().accept(this);
-            if(firstType instanceof ListType) {
-                int newSlot = slotOf("");
-                secondOperandCommands += String.format("astore %d\n", newSlot);
-                secondOperandCommands += (getNewList());
-                secondOperandCommands += String.format("aload %d\n", newSlot);
-                secondOperandCommands += "invokespecial List/<init>(LList;)V\n";
-            }
-            if(binaryExpression.getFirstOperand() instanceof Identifier) {
-                secondOperandCommands += ConvertPrimitiveToJavaObj(secondType);
-                secondOperandCommands += "\n";
-                commands += secondOperandCommands;
-                int slot = slotOf(((Identifier) binaryExpression.getFirstOperand()).getName());
-                commands += String.format("astore %d\n", slot);
-                commands += binaryExpression.getFirstOperand().accept(this);
-            }
-            else if(binaryExpression.getFirstOperand() instanceof ListAccessByIndex) {
-                ListAccessByIndex first = (ListAccessByIndex) binaryExpression.getFirstOperand();
-                commands += first.getInstance().accept(this);
-                commands += first.getIndex().accept(this);
-                secondOperandCommands += ConvertPrimitiveToJavaObj(secondType);
-                secondOperandCommands += "\n";
-                commands += secondOperandCommands;
-                commands += "invokevirtual List/setElement(ILjava/lang/Object;)V\n";
-                commands += binaryExpression.getFirstOperand().accept(this);
-            }
-            else if(binaryExpression.getFirstOperand() instanceof ObjectOrListMemberAccess) {
-                Expression instance = ((ObjectOrListMemberAccess) binaryExpression.getFirstOperand()).getInstance();
-                Type memberType = binaryExpression.getFirstOperand().accept(expressionTypeChecker);
-                String memberName = ((ObjectOrListMemberAccess) binaryExpression.getFirstOperand()).getMemberName().getName();
-                Type instanceType = instance.accept(expressionTypeChecker);
-                if(instanceType instanceof ListType) {
-                    commands += instance.accept(this);
-                    ArrayList<ListNameType> listElements = ((ListType) instanceType).getElementsTypes();
-                    int index = 0;
-                    for (ListNameType listElement : listElements) {
-                        if (listElement.getName().getName().equals(memberName)) {
-                            commands += String.format("ldc %d\n", index);
-                            secondOperandCommands += ConvertPrimitiveToJavaObj(secondType);
-                            secondOperandCommands += "\n";
-                            commands += secondOperandCommands;
-                            commands += "invokevirtual List/setElement(ILjava/lang/Object;)V\n";
-                            break;
-                        }
-                        index += 1;
-                    }
-                    commands += binaryExpression.getFirstOperand().accept(this);
-                }
-                else if(instanceType instanceof ClassType) {
-                    commands += instance.accept(this);
-                    secondOperandCommands += ConvertPrimitiveToJavaObj(secondType);
-                    secondOperandCommands += "\n";
-                    commands += secondOperandCommands;
-                    commands += String.format
-                            (
-                                    "putfield %s/%s %s",
-                                    ((ClassType) instanceType).getClassName().getName(),
-                                    memberName,
-                                    makeTypeSignature(memberType)
-                            );
-                    commands += "\n";
-                    commands += binaryExpression.getFirstOperand().accept(this);
-                }
-            }
+            commands += assignment(binaryExpression);
+            commands += binaryExpression.getFirstOperand().accept(this);
         }
         return commands;
     }
@@ -856,44 +867,16 @@ public class CodeGenerator extends Visitor<String> {
             commands += notOperator();
         }
         else if((operator == UnaryOperator.predec) || (operator == UnaryOperator.preinc)) {
-            if(unaryExpression.getOperand() instanceof Identifier) {
-                //todo
-            }
-            else if(unaryExpression.getOperand() instanceof ListAccessByIndex) {
-                //todo
-            }
-            else if(unaryExpression.getOperand() instanceof ObjectOrListMemberAccess) {
-                Expression instance = ((ObjectOrListMemberAccess) unaryExpression.getOperand()).getInstance();
-                Type memberType = unaryExpression.getOperand().accept(expressionTypeChecker);
-                String memberName = ((ObjectOrListMemberAccess) unaryExpression.getOperand()).getMemberName().getName();
-                Type instanceType = instance.accept(expressionTypeChecker);
-                if(instanceType instanceof ListType) {
-                    //todo
-                }
-                else if(instanceType instanceof ClassType) {
-                    //todo
-                }
-            }
+            BinaryOperator binaryOperator = operator == UnaryOperator.preinc ? BinaryOperator.add : BinaryOperator.sub;
+            Expression addition = (new BinaryExpression(unaryExpression.getOperand(), new IntValue(1), binaryOperator));
+            commands += assignment(new BinaryExpression(unaryExpression.getOperand(), addition, BinaryOperator.assign));
+            commands += unaryExpression.getOperand().accept(this);
         }
         else if((operator == UnaryOperator.postdec) || (operator == UnaryOperator.postinc)) {
-            if(unaryExpression.getOperand() instanceof Identifier) {
-                //todo
-            }
-            else if(unaryExpression.getOperand() instanceof ListAccessByIndex) {
-                //todo
-            }
-            else if(unaryExpression.getOperand() instanceof ObjectOrListMemberAccess) {
-                Expression instance = ((ObjectOrListMemberAccess) unaryExpression.getOperand()).getInstance();
-                Type memberType = unaryExpression.getOperand().accept(expressionTypeChecker);
-                String memberName = ((ObjectOrListMemberAccess) unaryExpression.getOperand()).getMemberName().getName();
-                Type instanceType = instance.accept(expressionTypeChecker);
-                if(instanceType instanceof ListType) {
-                    //todo
-                }
-                else if(instanceType instanceof ClassType) {
-                    //todo
-                }
-            }
+            BinaryOperator binaryOperator = operator == UnaryOperator.postinc ? BinaryOperator.add : BinaryOperator.sub;
+            commands += unaryExpression.getOperand().accept(this);
+            Expression addition = (new BinaryExpression(unaryExpression.getOperand(), new IntValue(1), binaryOperator));
+            commands += assignment(new BinaryExpression(unaryExpression.getOperand(), addition, BinaryOperator.assign));
         }
         return commands;
     }
