@@ -1,8 +1,16 @@
+class A{
+    s: int;
+    b: bool;
+    def A(a:int, c:int) {
+        print(c);
+    }
+}
 class Main{
-    f: int;
+    def A test() {
+        return new A(3, 4);
+    }
     def Main() {
-        a : list(b: int, c: bool);
-        print(a[1]);
-        print(a[0]);
+        print(this.test().s);
+        print(this.test().b);
     }
 }

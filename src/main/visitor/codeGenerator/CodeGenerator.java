@@ -894,9 +894,27 @@ public class CodeGenerator extends Visitor<String> {
 
     @Override
     public String visit(NewClassInstance newClassInstance) {
-        String commands = "";
-        //todo
-        return commands;
+        StringBuilder commands = new StringBuilder();
+        StringBuilder argumentString = new StringBuilder();
+        String className = newClassInstance.getClassType().getClassName().getName();
+        commands.append(String.format("new %s\n", className));
+        commands.append("dup\n");
+        for (Expression arg: newClassInstance.getArgs()) {
+            Type t = arg.accept(expressionTypeChecker);
+            argumentString.append(makeTypeSignature(t));
+            commands.append(arg.accept(this));
+            commands.append(ConvertPrimitiveToJavaObj(t));
+            commands.append("\n");
+
+        }
+        commands.append(
+                String.format(
+                            "invokespecial %s/<init>(%s)V",
+                            className,
+                            argumentString
+                        )
+        );
+        return commands.toString();
     }
 
     @Override
