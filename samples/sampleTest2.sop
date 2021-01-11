@@ -1,25 +1,12 @@
 class Main{
     def Main() {
+        l: list(3 # int);
         i: int;
-        j: int;
-        //i = 0;
-        //if (i < 5) {
 
-        //}
-        for (i = 0; i < 5; i = i+1) {
-            for (j = 0; j < 5; j = j+1) {
-                print(j);
-                if (j == 1) {
-                    print("ey baba");
-                    break;
-                }
+        l = [1, 2, 3];
 
-            }
-            if (i == 2) {
-                print("i break");
-                break;
-            }
+        foreach(i in l) {
+            print(i);
         }
-        print("here");
     }
 }

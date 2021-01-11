@@ -623,7 +623,75 @@ public class CodeGenerator extends Visitor<String> {
 
     @Override
     public String visit(ForeachStmt foreachStmt) {
-        //todo
+        addCommand(";---------Foreach begin");
+        String scopeLabel = getNewLabel();
+
+        String ForStmt = String.format("foreachStmt_%s", scopeLabel);
+        String endFor = String.format("endForeach_%s", scopeLabel);
+
+
+        int iteratorSlot = slotOf("");
+        addCommand("iconst_0");
+        addCommand(String.format("istore %d", iteratorSlot));
+
+
+        addCommand(foreachStmt.getList().accept(this));
+        addCommand(String.format("iload %d", iteratorSlot));
+        addCommand("invokevirtual List/getElement(I)Ljava/lang/Object;\n");
+        addCommand(castObject(foreachStmt.getVariable().accept(expressionTypeChecker)));
+
+        addCommand(String.format("astore %d", slotOf(foreachStmt.getVariable().getName())));
+
+
+
+
+        continueLabelStack.push(ForStmt);
+        breakLabelStack.push(endFor);
+
+        addCommand(String.format("%s:", ForStmt));
+
+        addCommand(String.format("iload %d", iteratorSlot));
+        addCommand("iconst_1");
+        addCommand("iadd");
+        addCommand(String.format("istore %d", iteratorSlot));
+
+        Statement body = foreachStmt.getBody();
+        if (body != null) {
+            body.accept(this);
+        }
+
+
+        addCommand(String.format("iload %d", iteratorSlot));
+        addCommand(foreachStmt.getList().accept(this));
+        addCommand(String.format(
+                            "getfield %s/%s %s",
+                            "List",
+                            "elements",
+                            "Ljava/util/ArrayList;"
+                        )
+        );
+        addCommand("invokevirtual java/util/ArrayList/size()I");
+        addCommand(compareExpressions("lt", "icmp"));
+
+
+        addCommand(String.format("ifeq %s", endFor));
+
+
+
+        addCommand(foreachStmt.getList().accept(this));
+        addCommand(String.format("iload %d", iteratorSlot));
+        addCommand("invokevirtual List/getElement(I)Ljava/lang/Object;\n");
+        addCommand(castObject(foreachStmt.getVariable().accept(expressionTypeChecker)));
+
+        addCommand(String.format("astore %d", slotOf(foreachStmt.getVariable().getName())));
+
+
+        addCommand(String.format("goto %s", ForStmt));
+        addCommand(String.format("%s:", endFor));
+
+        continueLabelStack.pop();
+        breakLabelStack.pop();
+
         return null;
     }
 
