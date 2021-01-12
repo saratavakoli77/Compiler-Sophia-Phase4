@@ -136,6 +136,8 @@ public class CodeGenerator extends Visitor<String> {
             return ((ClassType) t).getClassName().getName();
         else if (t instanceof FptrType)
             return "Fptr";
+        else if (t instanceof NullType)
+            return "null";
         else
             return "ERROR Type";
     }

@@ -1,16 +1,13 @@
 class A{
-    s: int;
-    b: bool;
-    def A(a:int, c:int) {
-        print(c);
+    def void test() {
+        print("hello");
+        //return 1;
     }
 }
 class Main{
-    def A test() {
-        return new A(3, 4);
-    }
     def Main() {
-        print(this.test().s);
-        print(this.test().b);
+        a: A;
+        a = new A();
+        a.test();
     }
 }
