@@ -1,12 +1,40 @@
+class WordProcessor
+{
+	def list(mylist: list(1 # list(key:string, value:int)),length: int) map(processinglist : list(1 # string)) {
+		//count the same number of names in the list
+		name : string;
+		size : int ;
+		found : bool;
+		result : list(1 # list(key:string, value:int)) ;
+		i : int;
+
+		size = 0;
+		foreach ( name in processinglist)
+		{
+			found = false;
+		//	for(i=0; i<size; i = i + 1)
+		//	{
+		//		if (result[i].key == name)
+		//		{
+		//			result[i].value = result[i].value + 1;
+		//			found = true;
+		//		}
+
+		//    }
+		   //if (!found) {
+			 	result[size].key = name;
+				result[size].value = 1;
+				size = size + 1;
+			//}
+
+		}
+		return [result,size];
+	}
+}
+
 class Main{
     def Main() {
-        l: list(3 # int);
-        i: int;
-
-        l = [1, 2, 3];
-
-        foreach(i in l) {
-            print(i);
-        }
+        wordProcessor : WordProcessor;
+        wordProcessor = new WordProcessor();
     }
 }

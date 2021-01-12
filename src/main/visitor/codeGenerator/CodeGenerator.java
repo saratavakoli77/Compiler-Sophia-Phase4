@@ -33,9 +33,9 @@ import main.symbolTable.exceptions.ItemNotFoundException;
 import main.symbolTable.items.ClassSymbolTableItem;
 import main.symbolTable.items.FieldSymbolTableItem;
 import main.symbolTable.utils.graph.Graph;
-//import main.symbolTable.utils.stack.Stack;
 import main.visitor.Visitor;
 import main.visitor.typeChecker.ExpressionTypeChecker;
+
 import java.util.Stack;
 import java.io.*;
 import java.util.ArrayList;
@@ -126,7 +126,7 @@ public class CodeGenerator extends Visitor<String> {
     private String getObjectType(Type t) {
         if (t instanceof IntType)
             return "java/lang/Integer";
-        else if (t instanceof ListType) //todo: is it ok?
+        else if (t instanceof ListType)
             return "List";
         else if (t instanceof BoolType)
             return "java/lang/Boolean";
@@ -210,7 +210,6 @@ public class CodeGenerator extends Visitor<String> {
         ArrayList<ListNameType> listElements = varType.getElementsTypes();
         for (ListNameType listElement : listElements) {
             addCommand(String.format("aload %d", tempSlot));
-            addCommand(";--- recursion call");
             putInitValue(listElement.getType());
             addCommand("invokevirtual java/util/ArrayList/add(Ljava/lang/Object;)Z");
             addCommand("pop");
@@ -252,7 +251,6 @@ public class CodeGenerator extends Visitor<String> {
         for (FieldDeclaration fieldDeclaration : currentClass.getFields()) {
             VarDeclaration varDec = fieldDeclaration.getVarDeclaration();
             addCommand("aload 0");
-            addCommand(";--- initializeFields call");
             putInitValue(varDec.getType());
             addCommand(
                     String.format(
@@ -300,10 +298,6 @@ public class CodeGenerator extends Visitor<String> {
                 return index;
             }
             index ++;
-        }
-
-        if (identifier.equals("-1")) {
-            return tempSlotInCurrentMethod + index;
         }
 
         if (identifier.equals("")) {
@@ -466,6 +460,7 @@ public class CodeGenerator extends Visitor<String> {
         if (constructorDeclaration.getArgs().size() > 0) {
             addDefaultConstructor();
         }
+        this.currentMethod = constructorDeclaration;
 
         if (isClassMain(currentClass)) {
             addStaticMainMethod();
@@ -515,7 +510,6 @@ public class CodeGenerator extends Visitor<String> {
 
     @Override
     public String visit(VarDeclaration varDeclaration) {
-        addCommand(";--- VarDeclaration call");
         putInitValue(varDeclaration.getType());
         addCommand(String.format("%s %d", "astore", slotOf(varDeclaration.getVarName().getName())));
         return null;
@@ -590,7 +584,7 @@ public class CodeGenerator extends Visitor<String> {
         Type argType = arg.accept(expressionTypeChecker);
         addCommand(arg.accept(this));
         addCommand(
-                String.format("invokevirtual java/io/PrintStream/println(%s)V",
+                String.format("invokevirtual java/io/PrintStream/print(%s)V",
                         getPrimitiveType(argType)
                 )
         );
@@ -626,11 +620,11 @@ public class CodeGenerator extends Visitor<String> {
 
     @Override
     public String visit(ForeachStmt foreachStmt) {
-        addCommand(";---------Foreach begin");
         String scopeLabel = getNewLabel();
 
-        String ForStmt = String.format("foreachStmt_%s", scopeLabel);
+        String forStart = String.format("foreachStmt_%s", scopeLabel);
         String endFor = String.format("endForeach_%s", scopeLabel);
+        String forUpdate = String.format("forUpdate_%s", scopeLabel);
 
 
         int iteratorSlot = slotOf("");
@@ -638,6 +632,29 @@ public class CodeGenerator extends Visitor<String> {
         addCommand(String.format("istore %d", iteratorSlot));
 
 
+        continueLabelStack.push(forUpdate);
+        breakLabelStack.push(endFor);
+
+        addCommand(String.format("%s:", forStart));
+
+
+        // check condition
+        addCommand(String.format("iload %d", iteratorSlot));
+        addCommand(foreachStmt.getList().accept(this));
+        addCommand(String.format(
+                "getfield %s/%s %s",
+                "List",
+                "elements",
+                "Ljava/util/ArrayList;"
+                )
+        );
+        addCommand("invokevirtual java/util/ArrayList/size()I");
+        addCommand(compareExpressions("lt", "icmp"));
+
+        addCommand(String.format("ifeq %s", endFor));
+
+
+        // get next element from list
         addCommand(foreachStmt.getList().accept(this));
         addCommand(String.format("iload %d", iteratorSlot));
         addCommand("invokevirtual List/getElement(I)Ljava/lang/Object;\n");
@@ -645,51 +662,22 @@ public class CodeGenerator extends Visitor<String> {
 
         addCommand(String.format("astore %d", slotOf(foreachStmt.getVariable().getName())));
 
+        // body stmt
+        Statement body = foreachStmt.getBody();
+        if (body != null) {
+            body.accept(this);
+        }
 
-
-
-        continueLabelStack.push(ForStmt);
-        breakLabelStack.push(endFor);
-
-        addCommand(String.format("%s:", ForStmt));
+        //update stmt
+        addCommand(String.format("%s:", forUpdate));
 
         addCommand(String.format("iload %d", iteratorSlot));
         addCommand("iconst_1");
         addCommand("iadd");
         addCommand(String.format("istore %d", iteratorSlot));
 
-        Statement body = foreachStmt.getBody();
-        if (body != null) {
-            body.accept(this);
-        }
 
-
-        addCommand(String.format("iload %d", iteratorSlot));
-        addCommand(foreachStmt.getList().accept(this));
-        addCommand(String.format(
-                            "getfield %s/%s %s",
-                            "List",
-                            "elements",
-                            "Ljava/util/ArrayList;"
-                        )
-        );
-        addCommand("invokevirtual java/util/ArrayList/size()I");
-        addCommand(compareExpressions("lt", "icmp"));
-
-
-        addCommand(String.format("ifeq %s", endFor));
-
-
-
-        addCommand(foreachStmt.getList().accept(this));
-        addCommand(String.format("iload %d", iteratorSlot));
-        addCommand("invokevirtual List/getElement(I)Ljava/lang/Object;\n");
-        addCommand(castObject(foreachStmt.getVariable().accept(expressionTypeChecker)));
-
-        addCommand(String.format("astore %d", slotOf(foreachStmt.getVariable().getName())));
-
-
-        addCommand(String.format("goto %s", ForStmt));
+        addCommand(String.format("goto %s", forStart));
         addCommand(String.format("%s:", endFor));
 
         continueLabelStack.pop();
@@ -702,18 +690,19 @@ public class CodeGenerator extends Visitor<String> {
     public String visit(ForStmt forStmt) {
         String scopeLabel = getNewLabel();
 
-        String ForStmt = String.format("forStmt_%s", scopeLabel);
+        String forStart = String.format("forStart_%s", scopeLabel);
         String endFor = String.format("endFor_%s", scopeLabel);
+        String forUpdate = String.format("forUpdate_%s", scopeLabel);
 
         Statement initialize = forStmt.getInitialize();
         if (initialize != null) {
             initialize.accept(this);
         }
 
-        continueLabelStack.push(ForStmt);
+        continueLabelStack.push(forUpdate);
         breakLabelStack.push(endFor);
 
-        addCommand(String.format("%s:", ForStmt));
+        addCommand(String.format("%s:", forStart));
 
         Expression condition = forStmt.getCondition();
         if (condition != null) {
@@ -727,12 +716,13 @@ public class CodeGenerator extends Visitor<String> {
             body.accept(this);
         }
 
+        addCommand(String.format("%s:", forUpdate));
         Statement update = forStmt.getUpdate();
         if (update != null) {
             update.accept(this);
         }
 
-        addCommand(String.format("goto %s", ForStmt));
+        addCommand(String.format("goto %s", forStart));
         addCommand(String.format("%s:", endFor));
 
         continueLabelStack.pop();
@@ -761,7 +751,6 @@ public class CodeGenerator extends Visitor<String> {
             commands += secondOperandCommands;
             int slot = slotOf(((Identifier) binaryExpression.getFirstOperand()).getName());
             commands += String.format("astore %d\n", slot);
-            //commands += binaryExpression.getFirstOperand().accept(this);
         }
         else if(binaryExpression.getFirstOperand() instanceof ListAccessByIndex) {
             ListAccessByIndex first = (ListAccessByIndex) binaryExpression.getFirstOperand();
@@ -771,7 +760,6 @@ public class CodeGenerator extends Visitor<String> {
             secondOperandCommands += "\n";
             commands += secondOperandCommands;
             commands += "invokevirtual List/setElement(ILjava/lang/Object;)V\n";
-            //commands += binaryExpression.getFirstOperand().accept(this);
         }
         else if(binaryExpression.getFirstOperand() instanceof ObjectOrListMemberAccess) {
             Expression instance = ((ObjectOrListMemberAccess) binaryExpression.getFirstOperand()).getInstance();
@@ -793,7 +781,6 @@ public class CodeGenerator extends Visitor<String> {
                     }
                     index += 1;
                 }
-                //commands += binaryExpression.getFirstOperand().accept(this);
             }
             else if(instanceType instanceof ClassType) {
                 commands += instance.accept(this);
@@ -808,7 +795,6 @@ public class CodeGenerator extends Visitor<String> {
                                 makeTypeSignature(memberType)
                         );
                 commands += "\n";
-                //commands += binaryExpression.getFirstOperand().accept(this);
             }
         }
 
@@ -844,7 +830,8 @@ public class CodeGenerator extends Visitor<String> {
             commands += compareExpressions(operator.toString(), "icmp");
         }
         else if((operator == BinaryOperator.eq) || (operator == BinaryOperator.neq)) {
-            commands += equalityExpressions(binaryExpression.getFirstOperand(), operator.toString());
+            String operatorString = operator == BinaryOperator.eq ? "eq" : "ne";
+            commands += equalityExpressions(binaryExpression.getFirstOperand(), operatorString);
         }
         else if(operator == BinaryOperator.and) {
             commands += shortCircuit(binaryExpression);
@@ -864,9 +851,11 @@ public class CodeGenerator extends Visitor<String> {
         UnaryOperator operator = unaryExpression.getOperator();
         String commands = "";
         if(operator == UnaryOperator.minus) {
+            commands += unaryExpression.getOperand().accept(this);
             commands += "ineg\n";
         }
         else if(operator == UnaryOperator.not) {
+            commands += unaryExpression.getOperand().accept(this);
             commands += notOperator();
         }
         else if((operator == UnaryOperator.predec) || (operator == UnaryOperator.preinc)) {
@@ -908,13 +897,11 @@ public class CodeGenerator extends Visitor<String> {
                     commands += convertJavaObjToPrimitive(memberType);
                     commands += "\n";
                 } catch (ItemNotFoundException memberIsMethod) {
-                    int tempSlot = slotOf("");
                     commands += "new Fptr\n";
                     commands += "dup\n";
                     commands += objectOrListMemberAccess.getInstance().accept(this);
                     commands += String.format("ldc \"%s\"\n", memberName);
                     commands += "invokespecial Fptr/<init>(Ljava/lang/Object;Ljava/lang/String;)V\n";
-                    commands += String.format("astore %d\n", tempSlot);
 
                 }
             } catch (ItemNotFoundException classNotFound) {
@@ -1004,7 +991,6 @@ public class CodeGenerator extends Visitor<String> {
             commands.append("pop\n");
         }
 
-        commands.append(String.format("aload %d\n", slotOf("-1")));
         commands.append(String.format("aload %d\n", tempSlot));
         commands.append("invokevirtual Fptr/invoke(Ljava/util/ArrayList;)Ljava/lang/Object;\n");
 

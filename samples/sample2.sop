@@ -63,15 +63,15 @@ class WordProcessor
 class Main{
     def Main() {
         wordProcessor : WordProcessor;
-        //myList : list(2 # string);
-        //i : int;
+        myList : list(100 # string);
+        i : int;
         wordProcessor = new WordProcessor();
-        //for(i = 0; i < 50; i = i + 1) {
-        //    myList[i] = "amir";
-        //}
-        //for(i = 50; i < 100; i = i + 1) {
-        //    myList[i] = "ali";
-        //}
-        //wordProcessor.wordProcess(myList);
+        for(i = 0; i < 50; i = i + 1) {
+            myList[i] = "amir";
+        }
+        for(i = 50; i < 100; i = i + 1) {
+            myList[i] = "ali";
+        }
+        wordProcessor.wordProcess(myList);
     }
 }
