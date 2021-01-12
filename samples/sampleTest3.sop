@@ -1,13 +1,12 @@
-class A{
-    def void test() {
-        print("hello");
-        //return 1;
-    }
-}
 class Main{
+    def int add (i: int) {
+        return i;
+    }
+    def void test(f: func<int->int>) {
+        print(f(1));
+    }
+
     def Main() {
-        a: A;
-        a = new A();
-        a.test();
+        this.test(this.add);
     }
 }

@@ -266,6 +266,7 @@ public class CodeGenerator extends Visitor<String> {
     }
 
     private void addDefaultConstructor() {
+        this.currentMethod = new MethodDeclaration(new Identifier("0defaultConstructor"), new NullType());
         addCommand(".method public <init>()V");
         addStackLocalSize();
         addCommand(";in addDefaultConstructor");
@@ -406,14 +407,14 @@ public class CodeGenerator extends Visitor<String> {
         String setTrue = String.format("setTrue_%s", scopeLabel);
         String scopeEnd = String.format("end_notOp_%s", scopeLabel);
 
-        commands += (String.format("\tifeq %s", setTrue));
-        commands += ("\ticonst_0");
-        commands += (String.format("\tgoto %s", scopeEnd));
+        commands += (String.format("ifeq %s\n", setTrue));
+        commands += ("iconst_0\n");
+        commands += (String.format("goto %s\n", scopeEnd));
 
-        commands += (String.format("%s:", setTrue));
-        commands += ("\ticonst_1");
+        commands += (String.format("%s:\n", setTrue));
+        commands += ("iconst_1\n");
 
-        commands += (String.format("%s:", scopeEnd));
+        commands += (String.format("%s:\n", scopeEnd));
 
         return commands;
     }
@@ -947,7 +948,7 @@ public class CodeGenerator extends Visitor<String> {
         int slotNumber = slotOf(identifier.getName());
         Type type = identifier.accept(expressionTypeChecker);
         String primitiveTypeConverter = convertJavaObjToPrimitive(type);
-        commands += String.format("aload_%d\n", slotNumber);
+        commands += String.format("aload %d\n", slotNumber);
         commands += !primitiveTypeConverter.equals("") ?
                     String.format("%s\n", primitiveTypeConverter) :
                     "";
@@ -1010,6 +1011,7 @@ public class CodeGenerator extends Visitor<String> {
         Type returnType = instanceType.getReturnType();
         commands.append(castObject(returnType));
         commands.append(convertJavaObjToPrimitive(returnType));
+        commands.append("\n");
 
         return commands.toString();
     }
